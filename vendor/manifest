@@ -113,7 +113,7 @@
 			"importpath": "github.com/docker/docker/cli/config",
 			"repository": "https://github.com/docker/docker",
 			"vcs": "git",
-			"revision": "338565805c31783c63f9bb35d5b24f4c0c5656d3",
+			"revision": "7936a962dc5f0f97fa2195c9497bc6e21e13fc2e",
 			"branch": "master",
 			"path": "/cli/config",
 			"notests": true

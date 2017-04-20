@@ -7,6 +7,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli/config"
+	"github.com/docker/docker/cli/config/configfile"
+	"github.com/docker/docker/cli/config/credentials"
 	"github.com/urfave/cli"
 )
 
@@ -36,11 +38,20 @@ func GetAuthConfig(c *cli.Context) (types.AuthConfig, error) {
 	}
 
 	// if they passed a specific registry, return those creds _if_ they exist
-	if c.GlobalString("registry") != "" {
-		if creds, ok := dcfg.AuthConfigs[c.GlobalString("registry")]; ok {
+	if registry := c.GlobalString("registry"); registry != "" {
+		// if credential helper exists, return the creds from the credential store
+		if store := getConfiguredCredentialStore(dcfg, registry); store != "" {
+			creds, err := credentials.NewNativeStore(dcfg, store).Get(registry)
+			if err != nil {
+				return types.AuthConfig{}, fmt.Errorf("Unable to retrieve auth from Credential Store: %v", err)
+			}
 			return creds, nil
 		}
-		return types.AuthConfig{}, fmt.Errorf("No authentication credentials exist for %s", c.GlobalString("registry"))
+
+		if creds, ok := dcfg.AuthConfigs[registry]; ok {
+			return creds, nil
+		}
+		return types.AuthConfig{}, fmt.Errorf("No authentication credentials exist for %s", registry)
 	}
 
 	// set the auth config as the registryURL, username and Password
@@ -74,4 +85,17 @@ func GetRepoAndRef(c *cli.Context) (repo, ref string, err error) {
 	}
 
 	return
+}
+
+// https://github.com/moby/moby/blob/603dd8b3b48273c0c7e1f2aef5f344acac66424e/cli/command/cli.go#L141
+// getConfiguredCredentialStore returns the credential helper configured for the
+// given registry, the default credsStore, or the empty string if neither are
+// configured.
+func getConfiguredCredentialStore(c *configfile.ConfigFile, serverAddress string) string {
+	if c.CredentialHelpers != nil && serverAddress != "" {
+		if helper, exists := c.CredentialHelpers[serverAddress]; exists {
+			return helper
+		}
+	}
+	return c.CredentialsStore
 }
